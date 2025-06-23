@@ -18,44 +18,48 @@ def load_projects_metadata(projects_dir):
 
 def main(page: ft.Page):
     page.title = "MidFall Exproler"
-    page.vertical_alignment = ft.MainAxisAlignment.CENTER
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.theme_mode = ft.ThemeMode.DARK
-    page.theme = ft.Theme(
-        color_scheme_seed=ft.Colors.BLUE,
-        color_scheme=ft.ColorScheme(
-            primary=ft.Colors.BLUE,
-            on_primary=ft.Colors.WHITE,
-            secondary=ft.Colors.GREEN,
-            on_secondary=ft.Colors.BLACK
-        )
+
+    # メニューバー
+    menu_bar = ft.AppBar(
+        title=ft.Text("MidFall Exproler"),
+        bgcolor=ft.Colors.BLUE_900,
+        actions=[
+            ft.IconButton(ft.Icons.REFRESH),
+            ft.IconButton(ft.Icons.SETTINGS),
+        ]
     )
 
     projects_dir = os.path.join(os.getcwd(), "Projects")
     projects = load_projects_metadata(projects_dir)
 
-    project_cards = []
+    # Finder風 横並びリスト（1行で横スクロール）
+    project_rows = []
     for project in projects:
-        card = ft.Card(
-            content=ft.Container(
-                content=ft.Column([
-                    ft.Text(f"名前: {project.get('name', '')}", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text(f"説明: {project.get('description', '')}"),
-                    ft.Text(f"作成日: {project.get('created_at', '')}"),
-                    ft.Text(f"更新日: {project.get('updated_at', '')}"),
-                    ft.Text(f"作者: {project.get('author', '')}"),
-                ]),
-                padding=20,
-            ),
-            elevation=4,
-            margin=10,
+        row = ft.Container(
+            content=ft.Row([
+                ft.Text(project.get('name', ''), size=18, weight=ft.FontWeight.BOLD),
+                ft.Text(project.get('updated_at', ''), size=14, color=ft.Colors.GREY_400),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            padding=ft.padding.symmetric(horizontal=24, vertical=12),
+            bgcolor=ft.Colors.BLUE_800,
+            border_radius=8,
+            margin=ft.margin.only(right=12),
+            width=280,
+            height=48,
         )
-        project_cards.append(card)
+        project_rows.append(row)
 
     page.add(
-        ft.Column(
-            controls=project_cards,
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        menu_bar,
+        ft.Container(
+            content=ft.Row(
+                controls=project_rows,
+                scroll=ft.ScrollMode.AUTO,
+                alignment=ft.MainAxisAlignment.START,
+            ),
+            padding=20,
+            expand=True,
         )
     )
 
