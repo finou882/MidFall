@@ -6,7 +6,7 @@ def load_projects_metadata(projects_dir):
     projects = []
     for project_name in os.listdir(projects_dir):
         project_path = os.path.join(projects_dir, project_name)
-        metadata_path = os.path.join(project_path, "metadata.json")
+        metadata_path = os.path.join(project_path, "metadata.mfe")
         if os.path.isdir(project_path) and os.path.isfile(metadata_path):
             with open(metadata_path, "r", encoding="utf-8") as f:
                 try:
@@ -35,6 +35,13 @@ def main(page: ft.Page):
 
     # Finder風 横並びリスト（1行で横スクロール）
     project_rows = []
+
+    def update_project_width(e=None):
+        width = page.width - 30 if page.width else 400
+        for row in project_rows:
+            row.width = width
+        page.update()
+
     for project in projects:
         row = ft.Container(
             content=ft.Row([
@@ -45,15 +52,18 @@ def main(page: ft.Page):
             bgcolor=ft.Colors.BLUE_800,
             border_radius=8,
             margin=ft.margin.only(right=12),
-            width=280,
+            width=page.width - 30 if page.width else 400,
             height=48,
         )
         project_rows.append(row)
 
+    # ウィンドウサイズ変更時に幅を更新
+    page.on_resize = update_project_width
+
     page.add(
         menu_bar,
         ft.Container(
-            content=ft.Row(
+            content=ft.Column(
                 controls=project_rows,
                 scroll=ft.ScrollMode.AUTO,
                 alignment=ft.MainAxisAlignment.START,
