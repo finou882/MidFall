@@ -4,6 +4,7 @@ import json
 import flet
 import shutil
 from datetime import datetime
+import random
 
 def load_projects_metadata(projects_dir):
     projects = []
@@ -39,10 +40,62 @@ def main(page: ft.Page):
         alignment=ft.MainAxisAlignment.START,
     )
 
+    # 詳細画面を表示する関数
+    def show_project_detail(project):
+        # タグのカラードット
+        tag_marks = []
+        for tag in project.get("tags", []):
+            tag_marks.append(
+                ft.Container(
+                    content=ft.Text("●", color=get_tag_color(tag), size=18),
+                    tooltip=tag,
+                    margin=ft.margin.only(right=4)
+                )
+            )
+        detail_view = ft.View(
+            "/detail",
+            controls=[
+                ft.AppBar(
+                    title=ft.Text(f"プロジェクト詳細: {project.get('name','')}"),
+                    bgcolor=ft.Colors.BLUE_900,
+                    leading=ft.IconButton(
+                        ft.Icons.ARROW_BACK,
+                        on_click=lambda e: (page.views.pop(), page.update())
+                    )
+                ),
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text(f"タイトル: {project.get('name','')}", size=24, weight=ft.FontWeight.BOLD),
+                        ft.Text(f"説明: {project.get('description','')}"),
+                        ft.Text(f"作成日: {project.get('created_at','')}"),
+                        ft.Text(f"更新日: {project.get('updated_at','')}"),
+                        ft.Text(f"作者: {project.get('author','')}"),
+                        ft.Row(tag_marks),
+                    ], spacing=10),
+                    padding=30,
+                ),
+            ]
+        )
+        page.views.append(detail_view)
+        page.update()
+
+    # make_project_rowのreturn部分を書き換え
     def make_project_row(project):
+        tag_marks = []
+        for tag in project.get("tags", []):
+            tag_marks.append(
+                ft.Container(
+                    content=ft.Text("●", color=get_tag_color(tag), size=18),
+                    tooltip=tag,
+                    margin=ft.margin.only(right=4)
+                )
+            )
         return ft.Container(
             content=ft.Row([
-                ft.Text(project.get('name', ''), size=18, weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.Text(project.get('name', ''), size=18, weight=ft.FontWeight.BOLD),
+                    *tag_marks
+                ]),
                 ft.Text(project.get('updated_at', ''), size=14, color=ft.Colors.GREY_400),
                 ft.IconButton(ft.Icons.EDIT, tooltip="リネーム", on_click=lambda e: rename_project_dialog(project)),
                 ft.IconButton(ft.Icons.DELETE, tooltip="削除", on_click=lambda e: delete_project(project)),
@@ -53,6 +106,8 @@ def main(page: ft.Page):
             margin=ft.margin.only(right=12),
             width=page.width - 230 if page.width else 400,
             height=48,
+            on_click=lambda e: show_project_detail(project),  # ← クリックで詳細画面へ
+            ink=True,
         )
 
     def refresh_projects():
@@ -187,13 +242,13 @@ def main(page: ft.Page):
         def refresh_tag_list():
             tag_list.controls.clear()
             for t in tags:
-                tag_name = ft.Text(t)
-                rename_field = ft.TextField(value=t, visible=False)
+                tag_name = ft.Text(t["name"])
+                rename_field = ft.TextField(value=t["name"], visible=False)
                 def show_rename(tf=rename_field, tn=tag_name):
                     tf.visible = True
                     tn.visible = False
                     page.update()
-                def do_rename(tf=rename_field, tn=tag_name, old=t):
+                def do_rename(tf=rename_field, tn=tag_name, old=t["name"]):
                     new_tag = tf.value.strip()
                     if not new_tag or new_tag in tags:
                         error_text.value = "タグ名が空か重複しています"
@@ -210,10 +265,10 @@ def main(page: ft.Page):
                     rename_field,
                     ft.IconButton(ft.Icons.EDIT, tooltip="リネーム", on_click=lambda e, tf=rename_field, tn=tag_name: show_rename(tf, tn)),
                     ft.IconButton(ft.Icons.DELETE, tooltip="削除", on_click=lambda e, tag=t: remove_tag(tag)),
-                    ft.TextButton("OK", visible=False, on_click=lambda e, tf=rename_field, tn=tag_name, old=t: do_rename(tf, tn, old))
+                    ft.TextButton("OK", visible=False, on_click=lambda e, tf=rename_field, tn=tag_name, old=t["name"]: do_rename(tf, tn, old))
                 ])
                 # rename_fieldのon_submitでdo_renameを呼ぶ
-                rename_field.on_submit = lambda e, tf=rename_field, tn=tag_name, old=t: do_rename(tf, tn, old)
+                rename_field.on_submit = lambda e, tf=rename_field, tn=tag_name, old=t["name"]: do_rename(tf, tn, old)
                 tag_list.controls.append(tag_row)
             page.update()
 
@@ -231,7 +286,7 @@ def main(page: ft.Page):
             page.update()
 
         def remove_tag(tag):
-            tags.remove(tag)
+            tags[:] = [t for t in tags if t["name"] != tag["name"]]
             save_tags(tags)
             refresh_tag_list()
             page.update()
@@ -258,6 +313,29 @@ def main(page: ft.Page):
         tags_path = os.path.join(projects_dir, "tags.json")
         with open(tags_path, "w", encoding="utf-8") as f:
             json.dump(tags, f, ensure_ascii=False, indent=2)
+
+    def get_tag_color(tag_name):
+        tags = load_tags()
+        for tag in tags:
+            if tag["name"] == tag_name:
+                return tag["color"]
+        # 未登録タグはランダム色を生成して保存
+        color_list = [
+            "#e57373", "#ba68c8", "#64b5f6", "#4db6ac", "#81c784", "#ffd54f",
+            "#ffb74d", "#a1887f", "#90a4ae", "#f06292", "#7986cb", "#4fc3f7",
+            "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3",
+            "#03a9f4", "#00bcd4", "#009688", "#8bc34a", "#cddc39", "#ffeb3b",
+            "#ffc107", "#ff9800", "#ff5722", "#795548", "#607d8b", "#bdbdbd",
+            "#d32f2f", "#c2185b", "#7b1fa2", "#512da8", "#1976d2", "#0288d1",
+            "#388e3c", "#689f38", "#afb42b", "#fbc02d", "#ffa000", "#f57c00",
+            "#e64a19", "#5d4037", "#616161", "#455a64", "#b2dfdb", "#c5cae9",
+            "#ffe082", "#ffccbc", "#d7ccc8", "#c8e6c9", "#b3e5fc", "#d1c4e9"
+        ]
+        import random
+        color = random.choice(color_list)
+        tags.append({"name": tag_name, "color": color})
+        save_tags(tags)
+        return color
 
     # サイドバー
     sidebar = ft.Container(
@@ -289,6 +367,15 @@ def main(page: ft.Page):
 
     # ウィンドウサイズ変更時に幅を更新
     page.on_resize = update_project_width
+
+    # ルート画面に戻る処理
+    def route_change(route):
+        if route == "/":
+            while len(page.views) > 1:
+                page.views.pop()
+            page.update()
+
+    page.on_route_change = route_change
 
     page.add(
         menu_bar,
