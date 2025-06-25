@@ -4,6 +4,7 @@ import json
 import flet
 import shutil
 from datetime import datetime
+import subprocess as subp
 import random
 
 def load_projects_metadata(projects_dir):
@@ -42,7 +43,8 @@ def main(page: ft.Page):
 
     # 詳細画面を表示する関数
     def show_project_detail(project):
-        # タグのカラードット
+        project_path = os.path.join(projects_dir, project["__folder"])
+        command = f'code "{project_path}"'
         tag_marks = []
         for tag in project.get("tags", []):
             tag_marks.append(
@@ -71,6 +73,11 @@ def main(page: ft.Page):
                         ft.Text(f"更新日: {project.get('updated_at','')}"),
                         ft.Text(f"作者: {project.get('author','')}"),
                         ft.Row(tag_marks),
+                        ft.IconButton(
+                            icon=ft.Icons.CODE,
+                            tooltip="Open in VSCode",
+                            on_click=lambda e: subp.run(command, shell=True)
+                        ),
                     ], spacing=10),
                     padding=30,
                 ),
