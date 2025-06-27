@@ -1,10 +1,9 @@
 import flet as ft
 import os
 import json
-import flet
 import shutil
 from datetime import datetime
-import subprocess as subp
+import subprocess
 import random
 
 def load_projects_metadata(projects_dir):
@@ -41,9 +40,46 @@ def main(page: ft.Page):
         alignment=ft.MainAxisAlignment.START,
     )
 
+    # タグの色取得
+    def get_tag_color(tag_name):
+        tags = load_tags()
+        for tag in tags:
+            if tag["name"] == tag_name:
+                return tag["color"]
+        # 未登録タグはランダム色を生成して保存
+        color_list = [
+            "#e57373", "#ba68c8", "#64b5f6", "#4db6ac", "#81c784", "#ffd54f",
+            "#ffb74d", "#a1887f", "#90a4ae", "#f06292", "#7986cb", "#4fc3f7",
+            "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3",
+            "#03a9f4", "#00bcd4", "#009688", "#8bc34a", "#cddc39", "#ffeb3b",
+            "#ffc107", "#ff9800", "#ff5722", "#795548", "#607d8b", "#bdbdbd",
+            "#d32f2f", "#c2185b", "#7b1fa2", "#512da8", "#1976d2", "#0288d1",
+            "#388e3c", "#689f38", "#afb42b", "#fbc02d", "#ffa000", "#f57c00",
+            "#e64a19", "#5d4037", "#616161", "#455a64", "#b2dfdb", "#c5cae9",
+            "#ffe082", "#ffccbc", "#d7ccc8", "#c8e6c9", "#b3e5fc", "#d1c4e9"
+        ]
+        color = random.choice(color_list)
+        tags.append({"name": tag_name, "color": color})
+        save_tags(tags)
+        return color
+
+    # タグの保存・読み込み
+    def load_tags():
+        tags_path = os.path.join(projects_dir, "tags.json")
+        if os.path.exists(tags_path):
+            with open(tags_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return []
+
+    def save_tags(tags):
+        tags_path = os.path.join(projects_dir, "tags.json")
+        with open(tags_path, "w", encoding="utf-8") as f:
+            json.dump(tags, f, ensure_ascii=False, indent=2)
+
     # 詳細画面を表示する関数
     def show_project_detail(project):
         project_path = os.path.join(projects_dir, project["__folder"])
+        runcommand ="s"
         command = f'code "{project_path}"'
         tag_marks = []
         for tag in project.get("tags", []):
@@ -76,7 +112,7 @@ def main(page: ft.Page):
                         ft.IconButton(
                             icon=ft.Icons.CODE,
                             tooltip="Open in VSCode",
-                            on_click=lambda e: subp.run(command, shell=True)
+                            on_click=lambda e: subprocess.run(command, shell=True)
                         ),
                     ], spacing=10),
                     padding=30,
@@ -86,7 +122,7 @@ def main(page: ft.Page):
         page.views.append(detail_view)
         page.update()
 
-    # make_project_rowのreturn部分を書き換え
+    # プロジェクト一覧の行
     def make_project_row(project):
         tag_marks = []
         for tag in project.get("tags", []):
@@ -113,7 +149,7 @@ def main(page: ft.Page):
             margin=ft.margin.only(right=12),
             width=page.width - 230 if page.width else 400,
             height=48,
-            on_click=lambda e: show_project_detail(project),  # ← クリックで詳細画面へ
+            on_click=lambda e: show_project_detail(project),  # クリックで詳細画面へ
             ink=True,
         )
 
@@ -129,8 +165,17 @@ def main(page: ft.Page):
         tags = load_tags()
         name_field = ft.TextField(label="プロジェクト名")
         desc_field = ft.TextField(label="説明")
-        tag_checks = [ft.Checkbox(label=tag) for tag in tags]
+        tag_checks = [ft.Checkbox(label=tag["name"]) for tag in tags]
+        git_clone_checkbox = ft.Checkbox(label="Gitリポジトリからクローン", value=False)
+        git_url_field = ft.TextField(label="GitリポジトリURL", visible=False)
         error_text = ft.Text("", color=ft.Colors.RED)
+
+        def on_git_clone_change(e):
+            git_url_field.visible = git_clone_checkbox.value
+            page.update()
+
+        git_clone_checkbox.on_change = on_git_clone_change
+
         def on_create(_):
             name = name_field.value.strip()
             desc = desc_field.value.strip()
@@ -145,7 +190,21 @@ def main(page: ft.Page):
                 page.update()
                 return
             now = datetime.now().strftime("%Y-%m-%d")
-            os.makedirs(project_path)
+            if git_clone_checkbox.value:
+                git_url = git_url_field.value.strip()
+                if not git_url:
+                    error_text.value = "GitリポジトリURLを入力してください"
+                    page.update()
+                    return
+                # git clone
+                try:
+                    subprocess.run(f'git clone "{git_url}" "{project_path}"', shell=True, check=True)
+                except Exception as ex:
+                    error_text.value = f"Gitクローン失敗: {ex}"
+                    page.update()
+                    return
+            else:
+                os.makedirs(project_path)
             metadata = {
                 "name": name,
                 "description": desc,
@@ -156,11 +215,21 @@ def main(page: ft.Page):
             }
             save_metadata(project_path, metadata)
             dlg.open = False
+            page.close(dlg)
             page.update()
             refresh_projects()
+
         dlg = ft.AlertDialog(
             title=ft.Text("新規プロジェクト作成"),
-            content=ft.Column([name_field, desc_field, ft.Text("タグ"), *tag_checks, error_text]),
+            content=ft.Column([
+                name_field,
+                desc_field,
+                ft.Text("タグ"),
+                *tag_checks,
+                git_clone_checkbox,
+                git_url_field,
+                error_text
+            ]),
             actions=[
                 ft.TextButton("作成", on_click=on_create),
                 ft.TextButton("キャンセル", on_click=lambda e: close_dialog(dlg))
@@ -172,11 +241,11 @@ def main(page: ft.Page):
 
     def close_dialog(dlg):
         dlg.open = False
+        page.close(dlg)
         page.update()
 
     def create_project(name, desc, dlg):
         # 使わない（add_project_dialog内で完結）
-
         pass
 
     def delete_project(project):
@@ -188,7 +257,7 @@ def main(page: ft.Page):
     def rename_project_dialog(project):
         tags = load_tags()
         name_field = ft.TextField(label="新しいプロジェクト名", value=project["name"])
-        tag_checks = [ft.Checkbox(label=tag, value=tag in project.get("tags", [])) for tag in tags]
+        tag_checks = [ft.Checkbox(label=tag["name"], value=tag["name"] in project.get("tags", [])) for tag in tags]
         error_text = ft.Text("", color=ft.Colors.RED)
         def on_rename(_):
             new_name = name_field.value.strip()
@@ -216,6 +285,7 @@ def main(page: ft.Page):
                     json.dump(data, f, ensure_ascii=False, indent=2)
                     f.truncate()
             dlg.open = False
+            page.close(dlg)
             page.update()
             refresh_projects()
         dlg = ft.AlertDialog(
@@ -229,10 +299,6 @@ def main(page: ft.Page):
         dlg.open = True
         page.open(dlg)
         page.update()
-
-    def rename_project(project, new_name, dlg):
-        # 使わない（rename_project_dialog内で完結）
-        pass
 
     def update_project_width(e=None):
         width = page.width - 230 if page.width else 400
@@ -257,12 +323,12 @@ def main(page: ft.Page):
                     page.update()
                 def do_rename(tf=rename_field, tn=tag_name, old=t["name"]):
                     new_tag = tf.value.strip()
-                    if not new_tag or new_tag in tags:
+                    if not new_tag or any(tag["name"] == new_tag for tag in tags):
                         error_text.value = "タグ名が空か重複しています"
                         page.update()
                         return
-                    idx = tags.index(old)
-                    tags[idx] = new_tag
+                    idx = tags.index(t)
+                    tags[idx]["name"] = new_tag
                     save_tags(tags)
                     refresh_tag_list()
                     error_text.value = ""
@@ -274,18 +340,29 @@ def main(page: ft.Page):
                     ft.IconButton(ft.Icons.DELETE, tooltip="削除", on_click=lambda e, tag=t: remove_tag(tag)),
                     ft.TextButton("OK", visible=False, on_click=lambda e, tf=rename_field, tn=tag_name, old=t["name"]: do_rename(tf, tn, old))
                 ])
-                # rename_fieldのon_submitでdo_renameを呼ぶ
                 rename_field.on_submit = lambda e, tf=rename_field, tn=tag_name, old=t["name"]: do_rename(tf, tn, old)
                 tag_list.controls.append(tag_row)
             page.update()
 
         def add_tag(_):
             new_tag = tag_field.value.strip()
-            if not new_tag or new_tag in tags:
+            if not new_tag or any(t["name"] == new_tag for t in tags):
                 error_text.value = "タグ名が空か重複しています"
                 page.update()
                 return
-            tags.append(new_tag)
+            color_list = [
+                "#e57373", "#ba68c8", "#64b5f6", "#4db6ac", "#81c784", "#ffd54f",
+                "#ffb74d", "#a1887f", "#90a4ae", "#f06292", "#7986cb", "#4fc3f7",
+                "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3",
+                "#03a9f4", "#00bcd4", "#009688", "#8bc34a", "#cddc39", "#ffeb3b",
+                "#ffc107", "#ff9800", "#ff5722", "#795548", "#607d8b", "#bdbdbd",
+                "#d32f2f", "#c2185b", "#7b1fa2", "#512da8", "#1976d2", "#0288d1",
+                "#388e3c", "#689f38", "#afb42b", "#fbc02d", "#ffa000", "#f57c00",
+                "#e64a19", "#5d4037", "#616161", "#455a64", "#b2dfdb", "#c5cae9",
+                "#ffe082", "#ffccbc", "#d7ccc8", "#c8e6c9", "#b3e5fc", "#d1c4e9"
+            ]
+            color = random.choice(color_list)
+            tags.append({"name": new_tag, "color": color})
             save_tags(tags)
             tag_field.value = ""
             error_text.value = ""
@@ -305,44 +382,9 @@ def main(page: ft.Page):
             content=ft.Column([tag_field, ft.TextButton("追加", on_click=add_tag), error_text, tag_list]),
             actions=[ft.TextButton("閉じる", on_click=lambda e: close_dialog(dlg))]
         )
-        page.open(dlg)
         dlg.open = True
+        page.open(dlg)
         page.update()
-
-    def load_tags():
-        tags_path = os.path.join(projects_dir, "tags.json")
-        if os.path.exists(tags_path):
-            with open(tags_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return []
-
-    def save_tags(tags):
-        tags_path = os.path.join(projects_dir, "tags.json")
-        with open(tags_path, "w", encoding="utf-8") as f:
-            json.dump(tags, f, ensure_ascii=False, indent=2)
-
-    def get_tag_color(tag_name):
-        tags = load_tags()
-        for tag in tags:
-            if tag["name"] == tag_name:
-                return tag["color"]
-        # 未登録タグはランダム色を生成して保存
-        color_list = [
-            "#e57373", "#ba68c8", "#64b5f6", "#4db6ac", "#81c784", "#ffd54f",
-            "#ffb74d", "#a1887f", "#90a4ae", "#f06292", "#7986cb", "#4fc3f7",
-            "#f44336", "#e91e63", "#9c27b0", "#673ab7", "#3f51b5", "#2196f3",
-            "#03a9f4", "#00bcd4", "#009688", "#8bc34a", "#cddc39", "#ffeb3b",
-            "#ffc107", "#ff9800", "#ff5722", "#795548", "#607d8b", "#bdbdbd",
-            "#d32f2f", "#c2185b", "#7b1fa2", "#512da8", "#1976d2", "#0288d1",
-            "#388e3c", "#689f38", "#afb42b", "#fbc02d", "#ffa000", "#f57c00",
-            "#e64a19", "#5d4037", "#616161", "#455a64", "#b2dfdb", "#c5cae9",
-            "#ffe082", "#ffccbc", "#d7ccc8", "#c8e6c9", "#b3e5fc", "#d1c4e9"
-        ]
-        import random
-        color = random.choice(color_list)
-        tags.append({"name": tag_name, "color": color})
-        save_tags(tags)
-        return color
 
     # サイドバー
     sidebar = ft.Container(
@@ -353,7 +395,7 @@ def main(page: ft.Page):
             ft.Text("サイドバー", size=20, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
             ft.Divider(),
             ft.TextButton("新規プロジェクト作成", icon=ft.Icons.ADD, on_click=add_project_dialog),
-            ft.TextButton("タグ管理", icon=ft.Icons.LABEL, on_click=tag_manage_dialog),  # ←追加
+            ft.TextButton("タグ管理", icon=ft.Icons.LABEL, on_click=tag_manage_dialog),
             ft.Text("メニュー1", color=ft.Colors.WHITE),
             ft.Text("メニュー2", color=ft.Colors.WHITE),
         ])
