@@ -29,3 +29,13 @@ jobs:
     - name: build with web
       run: |
         flet build web
+    - name: Setup Git user
+      shell: bash
+      run: |
+        git config --global user.email "finou@outlook.jp"
+        git config --global user.name "finou882"
+    - name: Version Update
+      run: |
+        git add .
+        git diff --staged --exit-code || (git commit -m 'ci(changelog): update version' && git push)
+          
