@@ -1,9 +1,9 @@
 name: build-windows
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "build" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "build" ]
 jobs:
   build:
     name: MSBuild
@@ -35,5 +35,12 @@ jobs:
         shell: powershell
         run: |
           flet build windows
-          ls ./build/windows/
+      
+      - name: Releace in build branch
+        shell: powershell
+        run: |
+          git checkout -b build
+          git add ./build/windows/midfall.exe
+          git commit -m "new build"
+          git push origin build
           
