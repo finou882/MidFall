@@ -35,7 +35,5 @@ jobs:
         shell: powershell
         run: |
           flet build windows
-          cd build
-          cd windows
-          ls
+          ls ./build/windows/
           
