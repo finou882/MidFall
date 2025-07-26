@@ -30,7 +30,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyqt5
           pip install flet
-
+      - name: Set encoding to UTF-8
+        shell: powershell
+        run: |
+          $env:PYTHONIOENCODING="utf-8"
       - name: buiid with windows
         shell: powershell
         run: |
