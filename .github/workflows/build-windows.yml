@@ -1,5 +1,4 @@
 name: build-windows
-on: workflow_call
 on:
   push:
     branches: [ "build" ]
