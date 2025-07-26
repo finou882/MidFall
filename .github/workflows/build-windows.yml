@@ -1,16 +1,9 @@
 name: build-windows
-on: 
-# push, pullrequest時にci実行
-    push:
-        paths-ignore:
-          - '.gitignore'
-          - 'LICENSE'
-          - '**.md'
-    pull_request:
-        paths-ignore:
-          - '.gitignore'
-          - 'LICENSE'
-          - '**.md'
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 jobs:
   build:
     name: MSBuild
@@ -38,12 +31,8 @@ jobs:
           pip install pyqt5
           pip install flet
 
-      - name: tetris
+      - name: buiid with windows
         shell: powershell
         run: |
-          Remove-Item -Recurse -Force tetris
-          git clone https://github.com/seigot/tetris
-          cd tetris
-          pip install -r requirements.txt
-          $Env:QT_QPA_PLATFORM = 'offscreen'
-          python start.py -m sample -t 3 -f $HOME/result.json
+          git add ./build/windows/
+          
