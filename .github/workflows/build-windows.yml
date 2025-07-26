@@ -34,5 +34,6 @@ jobs:
       - name: buiid with windows
         shell: powershell
         run: |
-          git add ./build/windows/
+          flet build windows
+          ls
           
