@@ -37,7 +37,7 @@ jobs:
       - name: buiid with windows
         shell: powershell
         run: |
-          flet build windows
+          flet build windows --no-rich-output
       
       - name: Releace in build branch
         shell: powershell
