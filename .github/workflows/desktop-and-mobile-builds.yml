@@ -146,6 +146,7 @@ jobs:
 
     - name: Flet Build AAB
       run: |
+        yes | flutter doctor --android-licenses
         flet build aab --verbose --build-number=$BUILD_NUMBER --build-version=$BUILD_VERSION
 
     - name: Upload AAB Artifact
@@ -175,6 +176,7 @@ jobs:
 
     - name: Flet Build APK
       run: |
+        yes | flutter doctor --android-licenses                                    
         flet build apk --verbose --build-number=$BUILD_NUMBER --build-version=$BUILD_VERSION
 
     - name: Upload APK Artifact
