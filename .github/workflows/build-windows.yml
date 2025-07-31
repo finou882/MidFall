@@ -37,7 +37,10 @@ jobs:
       - name: buiid with windows
         shell: powershell
         run: |
-          flet build windows --no-rich-output
+          set PYTHONIOENCODING=utf-8
+          set PYTHONUTF8=1
+          chcp 65001ｓ
+          flet build windows
       
       - name: Releace in build branch
         shell: powershell
